@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: Swyftx-Dev/confluence-markdown-sync@v1
+      - uses: Swyftx-Dev/confluence-markdown-sync@v2
         with:
           from: './docs/runbooks'  # Specify folder path
           to: '123456'     # Root page ID in Confluence
