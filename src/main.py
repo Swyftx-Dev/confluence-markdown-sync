@@ -1,5 +1,5 @@
-from os import environ
-from os.path import join
+from os import environ, walk
+from os.path import join, relpath
 from typing import Dict
 
 import requests
@@ -22,28 +22,41 @@ for key in ['from', 'to', 'cloud', 'user', 'token']:
         exit(1)
     envs[key] = value
 
-with open(join(workspace, envs['from'])) as f:
-    md = f.read()
+root_page_id = envs['to']
 
-url = f"https://{envs['cloud']}.atlassian.net/wiki/rest/api/content/{envs['to']}"
-
-current = requests.get(url, auth=(envs['user'], envs['token'])).json()
-
-html = markdown(md, extensions=[GithubFlavoredMarkdownExtension()])
-content = {
-    'id': current['id'],
-    'type': current['type'],
-    'title': current['title'],
-    'version': {'number': current['version']['number'] + 1},
-    'body': {
-        'editor': {
-            'value': html,
-            'representation': 'editor'
+# Function to create child page
+def create_page(title, parent_id, content_html):
+    url = f"https://{envs['cloud']}.atlassian.net/wiki/rest/api/content/"
+    data = {
+        "type": "page",
+        "title": title,
+        "ancestors": [{"id": parent_id}],
+        "space": {"key": "SPACEKEY"},  # Replace with your space key
+        "body": {
+            "storage": {
+                "value": content_html,
+                "representation": "storage"
+            }
         }
     }
-}
+    response = requests.post(url, json=data, auth=(envs['user'], envs['token']))
+    return response.json()['id']
 
-updated = requests.put(url, json=content, auth=(
-    envs['user'], envs['token'])).json()
-link = updated['_links']['base'] + updated['_links']['webui']
-print(f'Uploaded content successfully to page {link}')
+# Traverse the folder and sync each markdown file
+for dirpath, _, filenames in walk(join(workspace, envs['from'])):
+    parent_page_id = root_page_id
+
+    # Create child pages for subfolders
+    if dirpath != workspace:
+        subfolder_name = relpath(dirpath, workspace)
+        parent_page_id = create_page(subfolder_name, root_page_id, "Folder content")
+
+    # Sync each markdown file as a new Confluence page
+    for filename in filenames:
+        if filename.endswith(".md"):
+            with open(join(dirpath, filename), 'r') as f:
+                md_content = f.read()
+            html_content = markdown(md_content, extensions=[GithubFlavoredMarkdownExtension()])
+            create_page(filename.replace(".md", ""), parent_page_id, html_content)
+
+print(f'Successfully synced folder content to Confluence.')

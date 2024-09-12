@@ -8,10 +8,13 @@ requests = "*"
 markdown = "*"
 py-gfm = "*"
 python-dotenv = "*"
+loguru = "*" # For logging
+tenacity = "*"
 
 [dev-packages]
 autopep8 = "*"
 mypy = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.10"
